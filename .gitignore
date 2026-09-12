@@ -1,0 +1,11 @@
+/*
+!/.gitignore
+!/.env.example
+!/README.md
+!/requirements.txt
+!/bridge.py
+!/scenario_seed.json
+!/scenario.json
+!/voiceops.py
+!/voiceops_prompt.md
+!/reset_demo.py
