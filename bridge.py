@@ -1,10 +1,11 @@
 import logging
 import os
+import uuid
 
-import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from twilio.request_validator import RequestValidator
+from voiceops import handle_turn
 
 load_dotenv()
 
@@ -63,58 +64,6 @@ async def voice(request: Request):
     return Response(content=twiml, media_type="application/xml")
 
 
-async def ask_hermes(message: str) -> str:
-    headers = {
-        "Authorization": f"Bearer {HERMES_API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    body = {
-        "model": "hermes-agent",
-        "messages": [
-            {
-                "role": "user",
-                "content": message
-            }
-        ],
-    }
-
-    logger.info("Sending prompt to Hermes")
-
-    try:
-        async with httpx.AsyncClient(timeout=120) as client:
-            response = await client.post(
-                HERMES_URL,
-                headers=headers,
-                json=body,
-            )
-
-            response.raise_for_status()
-            data = response.json()
-
-        logger.info("Hermes responded successfully")
-        return data["choices"][0]["message"]["content"]
-
-    except httpx.ConnectError:
-        logger.exception("Unable to connect to Hermes")
-        return "Hermes is currently unavailable. Please try again later."
-
-    except httpx.TimeoutException:
-        logger.exception("Hermes request timed out")
-        return "Hermes did not respond in time. Please try again."
-
-    except httpx.HTTPStatusError as exc:
-        logger.exception(
-            "Hermes returned HTTP error %s",
-            exc.response.status_code
-        )
-        return "Hermes returned an error. Please try again."
-
-    except Exception:
-        logger.exception("Unexpected Hermes error")
-        return "An unexpected error occurred while contacting Hermes."
-
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     signature = websocket.headers.get("X-Twilio-Signature", "")
@@ -126,6 +75,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     logger.info("Accepted Twilio ConversationRelay WebSocket")
+    fallback_session_id = f"ws-{uuid.uuid4().hex}"
+    session_id = fallback_session_id
 
     try:
         while True:
@@ -134,10 +85,19 @@ async def websocket_endpoint(websocket: WebSocket):
             message_type = data.get("type")
             logger.info("ConversationRelay message type: %s", message_type)
 
+            if message_type == "setup":
+                candidate_session_id = data.get("callSid") or data.get("sessionId")
+                if isinstance(candidate_session_id, str) and candidate_session_id.strip():
+                    session_id = candidate_session_id.strip()
+                else:
+                    session_id = fallback_session_id
+                logger.info("ConversationRelay session established")
+                continue
+
             if message_type != "prompt":
                 continue
 
-            if not data.get("last", True):
+            if data.get("last") is not True:
                 continue
 
             user_text = data.get("voicePrompt", "")
@@ -147,11 +107,18 @@ async def websocket_endpoint(websocket: WebSocket):
 
             logger.info("Received caller prompt")
 
-            hermes_response = await ask_hermes(user_text)
+            try:
+                response_text = await handle_turn(session_id, user_text)
+            except Exception:
+                logger.exception("VoiceOps handler failed")
+                response_text = (
+                    "I hit an internal VoiceOps error and could not complete that step. "
+                    "Please try again."
+                )
 
             await websocket.send_json({
                 "type": "text",
-                "token": hermes_response,
+                "token": response_text,
                 "last": True
             })
 

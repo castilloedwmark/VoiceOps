@@ -1,0 +1,147 @@
+{
+  "scenario_id": "SCN-001",
+  "incident": {
+    "incident_id": "INC-PDX-001",
+    "severity": "SEV-2",
+    "status": "ACTIVE",
+    "site": "PDX",
+    "service": "Microsoft Teams Direct Routing outbound PSTN",
+    "summary": "Users in Portland cannot complete outbound Teams-to-PSTN calls",
+    "opened_at": "14:00"
+  },
+  "timeline": [
+    {"time": "13:30", "event": "Calls healthy"},
+    {"time": "13:38", "event": "CHG-1042 starts"},
+    {"time": "13:42", "event": "CHG-1042 completes"},
+    {"time": "13:43", "event": "Portland failures begin"},
+    {"time": "13:45", "event": "Portland success rate collapses"},
+    {"time": "13:53", "event": "Alert fires"},
+    {"time": "13:55", "event": "Synthetic Portland call fails"},
+    {"time": "14:00", "event": "Incident opens"},
+    {"time": "14:06", "event": "VoiceOps contacted"}
+  ],
+  "sites": {
+    "PDX": {
+      "city": "Portland",
+      "voice_service": "DEGRADED",
+      "inbound_pstn": "HEALTHY",
+      "outbound_pstn": "DEGRADED",
+      "sbc": {
+        "hostname": "sbc-pdx-01",
+        "host_health": "HEALTHY",
+        "cpu_pct": 24,
+        "memory_pct": 39,
+        "process_status": "RUNNING",
+        "teams_tls_signaling": "UP"
+      },
+      "routing": {
+        "active_policy": "pdx-outbound-v42",
+        "outbound_route_group": "carrier-west-maint",
+        "enabled_peers": 0
+      },
+      "sip": {
+        "baseline_failure_rate_pct": 1.0,
+        "current_failure_rate_pct": 36.0,
+        "failure_spike_started_at": "13:43",
+        "dominant_failure_code": 503,
+        "dominant_failure_reason": "Service Unavailable"
+      }
+    },
+    "SEA": {
+      "city": "Seattle",
+      "voice_service": "HEALTHY",
+      "inbound_pstn": "HEALTHY",
+      "outbound_pstn": "HEALTHY",
+      "sbc": {
+        "hostname": "sbc-sea-01",
+        "host_health": "HEALTHY",
+        "cpu_pct": 21,
+        "memory_pct": 35,
+        "process_status": "RUNNING",
+        "teams_tls_signaling": "UP"
+      },
+      "routing": {
+        "active_policy": "sea-outbound-v17",
+        "outbound_route_group": "carrier-west-primary",
+        "enabled_peers": 2
+      },
+      "sip": {
+        "baseline_failure_rate_pct": 1.0,
+        "current_failure_rate_pct": 1.1,
+        "failure_spike_started_at": null,
+        "dominant_failure_code": null,
+        "dominant_failure_reason": null
+      }
+    },
+    "DEN": {
+      "city": "Denver",
+      "voice_service": "HEALTHY",
+      "inbound_pstn": "HEALTHY",
+      "outbound_pstn": "HEALTHY",
+      "sbc": {
+        "hostname": "sbc-den-01",
+        "host_health": "HEALTHY",
+        "cpu_pct": 27,
+        "memory_pct": 42,
+        "process_status": "RUNNING",
+        "teams_tls_signaling": "UP"
+      },
+      "routing": {
+        "active_policy": "den-outbound-v23",
+        "outbound_route_group": "carrier-central-primary",
+        "enabled_peers": 2
+      },
+      "sip": {
+        "baseline_failure_rate_pct": 1.0,
+        "current_failure_rate_pct": 1.4,
+        "failure_spike_started_at": null,
+        "dominant_failure_code": null,
+        "dominant_failure_reason": null
+      }
+    }
+  },
+  "changes": {
+    "CHG-1042": {
+      "change_id": "CHG-1042",
+      "target": "sbc-pdx-01",
+      "site": "PDX",
+      "change_type": "routing-policy configuration",
+      "status": "DEPLOYED",
+      "started_at": "13:38",
+      "completed_at": "13:42",
+      "before": {
+        "policy": "pdx-outbound-v41",
+        "outbound_route_group": "carrier-west-primary",
+        "enabled_peers": 2
+      },
+      "after": {
+        "policy": "pdx-outbound-v42",
+        "outbound_route_group": "carrier-west-maint",
+        "enabled_peers": 0
+      }
+    }
+  },
+  "synthetic_tests": {
+    "PDX": {
+      "result": "FAILED",
+      "sip_final_response": 503,
+      "failure_reason": "NO_ROUTE_AVAILABLE"
+    },
+    "SEA": {
+      "result": "SUCCESS",
+      "sip_final_response": 200,
+      "failure_reason": null
+    },
+    "DEN": {
+      "result": "SUCCESS",
+      "sip_final_response": 200,
+      "failure_reason": null
+    }
+  },
+  "runtime": {
+    "rollback_complete": false,
+    "verified": false,
+    "rollback_count": 0,
+    "synthetic_test_sequence": 0
+  }
+}
